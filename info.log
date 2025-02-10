@@ -1,0 +1,19 @@
+INFO-20250206-15:31:04|FasterRCNN loaded with /home/oem/Projet/swisstransfer_28ca12f3-b0d3-4ef1-b412-8bed38d0dd2b/pretrained-models/fasterrcnn-scale1-bs32-epochs100-weights.pth
+INFO-20250206-15:31:04|Model loaded on cpu
+INFO-20250207-15:57:58|FasterRCNN loaded with /home/oem/Projet/swisstransfer_28ca12f3-b0d3-4ef1-b412-8bed38d0dd2b/pretrained-models/fasterrcnn-scale1-bs32-epochs100-weights.pth
+INFO-20250207-15:57:58|Model loaded on cpu
+INFO-20250207-16:24:54|FasterRCNN loaded with /home/oem/Projet/projet/pretrained-models/fasterrcnn-scale1-bs32-epochs100-weights.pth
+INFO-20250207-16:24:54|Model loaded on cpu
+INFO-20250207-16:25:29|Launching inference on 11 images
+INFO-20250207-16:28:12|FasterRCNN loaded with /home/oem/Projet/projet/pretrained-models/fasterrcnn-scale1-bs32-epochs100-weights.pth
+INFO-20250207-16:28:12|Model loaded on cpu
+INFO-20250207-16:28:17|Launching inference on 1 images
+INFO-20250207-16:40:26|FasterRCNN loaded with /home/oem/Projet/projet/pretrained-models/fasterrcnn-scale1-bs32-epochs100-weights.pth
+INFO-20250207-16:40:26|Model loaded on cpu
+INFO-20250207-16:40:34|Launching inference on 1 images
+INFO-20250207-16:41:40|From get_sliced_prediction : Performing prediction on 336 number of slices.
+Slicing performed in 0.2937788963317871 seconds.
+Prediction performed in 65.58084106445312 seconds.At /home/oem/Projet/DATASET/castillonville_05_2023_DJI_0733.JPG, circle selection: [82, 19]
+INFO-20250207-16:41:40|Results received : {'/home/oem/Projet/DATASET/castillonville_05_2023_DJI_0733.JPG': [82, 19]}
+INFO-20250207-16:41:40|Inference on all the images done with no issues
+INFO-20250207-16:42:06|Exporting to Excel

@@ -1,0 +1,17 @@
+{
+  "include": [
+    "src"
+  ],
+  
+  "exclude": [
+    "**/__pycache__"
+  ],
+
+  "ignore": [
+    "src/*.ipynb"
+  ],
+
+  "venvPath": "/home/alexis/anaconda3/envs",
+
+  "venv": "argus"
+}

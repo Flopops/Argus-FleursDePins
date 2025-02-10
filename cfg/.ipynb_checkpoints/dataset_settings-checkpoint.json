@@ -1,0 +1,10 @@
+{
+    "plots": [
+        "stsardos_A"
+    ],
+    "plot_parent_path": "/mnt/sda1/1-Pins/traitees_2020_2021/",
+    "img_dir": "/mnt/sda1/1-Pins/traitees_2020_2021/stsardos_A/",
+    "annotations_file": "/mnt/sda1/1-Pins/traitees_2020_2021/stsardos_A/labels.csv",
+    "labri_plot_parent_path": "/mnt/sda1/1-Pins/traitees_2020_2021/",
+    "home_plot_parent_path": "/home/plagueis/Development/ARGUS/traitees_2020_2021/"
+}
