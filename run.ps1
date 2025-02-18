@@ -14,14 +14,22 @@ else {
 }
 
 function CheckPythonInstallation {
-    $python = Get-Command "py" -ErrorAction SilentlyContinue
-    # TODO: check which version is installed and give it -3.10
-    if ($null -eq $python) {
-        Write-Host -ForegroundColor Red "ERROR: Python3 is not found. Please install Python 3 and add it to your PATH."
+    $python = ""
+    
+    if (Get-Command "python" -ErrorAction SilentlyContinue) {
+        $python = "python"
+    }
+    elseif (Get-Command "py" -ErrorAction SilentlyContinue) {
+        $python = "py -3.10"
+    }
+
+    if ($python -eq "") {
+        Write-Host -ForegroundColor Red "ERROR: Python3 is not found. Please install Python 3.10 and add it to your PATH."
         Write-Host "You can download Python 3.10 from https://www.python.org/downloads/ : RTFM !!!"
         exit 2
     }
-    return "py -3.10"
+
+    return $python
 }
 
 $python = CheckPythonInstallation
@@ -43,5 +51,5 @@ if (-not $EnvCreated) {
 }
 
 Write-Host "`nLaunching app...`n"
-Invoke-Expression "$python (Join-Path -Path $ScriptDir -ChildPath 'src\app.py')"
+Invoke-Expression "$python `"$($ScriptDir)\src\app.py`""
 deactivate
