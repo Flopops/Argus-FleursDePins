@@ -4,9 +4,10 @@ import numpy as np
 import torch
 import torchvision
 from sklearn.cluster import DBSCAN
+import os
 # Charger le modèle YOLO avec les poids personnalisés
 model = YOLO('best.pt')
-def predict_image(original_image_path,model):
+def predict_image(original_image_path, model, save_annotations=False, output_directory=None):
     
 
 
@@ -87,7 +88,12 @@ def predict_image(original_image_path,model):
     annotation_counts = {
         'pine_flowers': len(final_detections)
     }
-    # Sauvegarder l'image complète avec les annotations
-    #cv2.imwrite('output_image_with_annotations_merged.jpg', annotated_image)
+    if save_annotations and output_directory:
+        output_filename = os.path.join(
+            output_directory,
+            f"annotated_{os.path.basename(original_image_path)}"
+        )
+        cv2.imwrite(output_filename, annotated_image)
+
     return annotation_counts
 

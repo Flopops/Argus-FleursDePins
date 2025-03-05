@@ -2,7 +2,7 @@ import os
 import csv
 from PyQt5.QtWidgets import (
     QLabel, QPushButton, QVBoxLayout, QWidget, QFileDialog, QScrollArea,
-    QHBoxLayout, QMessageBox, QProgressBar, QStackedWidget
+    QHBoxLayout, QMessageBox, QProgressBar, QStackedWidget, QCheckBox
 )
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
@@ -37,7 +37,7 @@ class PredictUI(QWidget):
         layout.addWidget(self.progress_bar)
 
         # Label pour afficher les résultats
-        self.result_label = QLabel("Résultats apparaîtront ici", self)
+        self.result_label = QLabel("", self)
         self.result_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.result_label)
 
@@ -54,6 +54,9 @@ class PredictUI(QWidget):
 
         # Stocker les chemins des images
         self.image_paths = []
+        self.save_annotations_checkbox = QCheckBox("Sauvegarder les images avec annotations", self)
+        layout.addWidget(self.save_annotations_checkbox)
+        self.output_directory = None
 
     def load_images(self):
         options = QFileDialog.Options()
@@ -76,6 +79,17 @@ class PredictUI(QWidget):
             QMessageBox.warning(self, "Erreur", "Veuillez d'abord charger des images.")
             return
 
+        # Si la checkbox est cochée, demander le dossier de sauvegarde
+        if self.save_annotations_checkbox.isChecked():
+            self.output_directory = QFileDialog.getExistingDirectory(
+                self,
+                "Sélectionner le dossier de sauvegarde des images annotées",
+                "",
+                QFileDialog.ShowDirsOnly
+            )
+            if not self.output_directory:  # Si l'utilisateur annule
+                return
+
         # Désactiver les boutons pendant le traitement
         self.predict_button.setEnabled(False)
         self.load_button.setEnabled(False)
@@ -85,7 +99,12 @@ class PredictUI(QWidget):
         self.progress_bar.setValue(0)
 
         # Créer et démarrer le thread de prédiction
-        self.prediction_thread = PredictionThread(self.image_paths, model)
+        self.prediction_thread = PredictionThread(
+            self.image_paths,
+            model,
+            self.save_annotations_checkbox.isChecked(),
+            self.output_directory
+        )
         self.prediction_thread.progress_updated.connect(self.update_progress)
         self.prediction_thread.prediction_complete.connect(self.save_predictions)
         self.prediction_thread.error_occurred.connect(self.handle_prediction_error)
@@ -224,17 +243,25 @@ class PredictionThread(QThread):
     prediction_complete = pyqtSignal(list)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, image_paths, model):
+    def __init__(self, image_paths, model, save_annotations=False, output_directory=None):
         super().__init__()
         self.image_paths = image_paths
         self.model = model
+        self.save_annotations = save_annotations
+        self.output_directory = output_directory
+
 
     def run(self):
         try:
             results = []
             for i, image_path in enumerate(self.image_paths):
                 # Faire la prédiction
-                counts = predict_image(image_path, self.model)
+                counts = predict_image(
+                    image_path,
+                    self.model,
+                    save_annotations=self.save_annotations,
+                    output_directory=self.output_directory
+                )
 
                 # Stocker les résultats
                 results.append({
