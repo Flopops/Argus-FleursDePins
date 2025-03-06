@@ -44,6 +44,10 @@ class PredictUI(QWidget):
         # Thread pour le chargement des images
         self.loader_thread = None
 
+        self.save_annotations_checkbox = QCheckBox("Sauvegarder les images avec annotations", self)
+        layout.addWidget(self.save_annotations_checkbox)
+        self.output_directory = None
+
         # Ajouter un bouton pour lancer la prédiction
         self.predict_button = QPushButton("Lancer la prédiction", self)
         self.predict_button.clicked.connect(self.process_predictions)
@@ -54,14 +58,12 @@ class PredictUI(QWidget):
 
         # Stocker les chemins des images
         self.image_paths = []
-        self.save_annotations_checkbox = QCheckBox("Sauvegarder les images avec annotations", self)
-        layout.addWidget(self.save_annotations_checkbox)
-        self.output_directory = None
+        
 
     def load_images(self):
         options = QFileDialog.Options()
         file_names, _ = QFileDialog.getOpenFileNames(self, "Charger des images", "",
-                                                     "Images (*.png *.xpm *.jpg *.jpeg *.tiff *.bmp);;All Files (*)", options=options)
+                                                     "Images (*.png *.xpm *.jpg *.jpeg *.tiff *.bmp *tif);;All Files (*)", options=options)
         if file_names:
             # Ajouter les nouveaux chemins à la liste existante
             self.image_paths.extend(file_names)
@@ -101,7 +103,6 @@ class PredictUI(QWidget):
         # Créer et démarrer le thread de prédiction
         self.prediction_thread = PredictionThread(
             self.image_paths,
-            model,
             self.save_annotations_checkbox.isChecked(),
             self.output_directory
         )
@@ -212,7 +213,7 @@ class DropZoneWidget(QWidget):
             file_paths = []
             for url in event.mimeData().urls():
                 file_path = url.toLocalFile()
-                if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.xpm')):
+                if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff','tif', '.bmp', '.xpm')):
                     file_paths.append(file_path)
             if file_paths:
                 self.files_dropped.emit(file_paths)
@@ -243,22 +244,19 @@ class PredictionThread(QThread):
     prediction_complete = pyqtSignal(list)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, image_paths, model, save_annotations=False, output_directory=None):
+    def __init__(self, image_paths, save_annotations=False, output_directory=None):
         super().__init__()
         self.image_paths = image_paths
-        self.model = model
         self.save_annotations = save_annotations
         self.output_directory = output_directory
-
 
     def run(self):
         try:
             results = []
             for i, image_path in enumerate(self.image_paths):
-                # Faire la prédiction
+                # Modifier cet appel pour enlever self.model
                 counts = predict_image(
                     image_path,
-                    self.model,
                     save_annotations=self.save_annotations,
                     output_directory=self.output_directory
                 )
