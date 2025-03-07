@@ -1,15 +1,18 @@
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, 
+    QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog,
     QFormLayout, QSpinBox, QLineEdit, QHBoxLayout, QMessageBox, QProgressBar, QGroupBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
-from utils.utils_continous_learning import continual_learning_yolov8
+from utils.utils_continous_learning import continual_learning_yolo
 import json
 import os
+from datetime import datetime
+from ultralytics import YOLO
 
 class TrainingThread(QThread):
     progress_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
+    CONFIG_FILE = "config/model_config.json"
 
     def __init__(self, model_path, yaml_path, epochs, img_size, batch_size):
         super().__init__()
@@ -22,14 +25,15 @@ class TrainingThread(QThread):
     def run(self):
         try:
             self.progress_signal.emit("Démarrage de l'apprentissage...")
-            continual_learning_yolov8(
-                model_path=self.model_path,
-                data_config_path=self.yaml_path,
-                epochs=self.epochs,
-                img_size=self.img_size,
-                batch_size=self.batch_size
-            )
-            self.finished_signal.emit(True, "Apprentissage terminé avec succès!")
+
+            # Générer le chemin de sauvegarde avec la date et l'heure
+            model_name = os.path.splitext(os.path.basename(self.model_path))[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path = os.path.join(os.path.dirname(self.model_path), f"{model_name}_{timestamp}.pt")
+
+            continual_learning_yolo(self.model_path,self.yaml_path,self.epochs,self.img_size,self.batch_size,save_path)
+
+            self.finished_signal.emit(True, f"Apprentissage terminé avec succès! Modèle sauvegardé à {save_path}")
         except Exception as e:
             self.finished_signal.emit(False, f"Erreur: {str(e)}")
 
@@ -57,12 +61,12 @@ class ContinuousLearningUI(QWidget):
                 border-color: #666;
             }
         """)
-        
+
         drop_layout = QVBoxLayout(self.drop_zone)
         self.drop_label = QLabel("Glissez votre fichier YAML ici\nou cliquez pour sélectionner")
         self.drop_label.setAlignment(Qt.AlignCenter)
         drop_layout.addWidget(self.drop_label)
-        
+
         main_layout.addWidget(self.drop_zone)
         self.drop_zone.installEventFilter(self)
         self.drop_zone.mousePressEvent = self.select_yaml
