@@ -1,99 +1,96 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, 
-    QFormLayout, QSpinBox, QLineEdit, QHBoxLayout
+    QFormLayout, QSpinBox, QLineEdit, QHBoxLayout, QMessageBox, QProgressBar, QGroupBox
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QThread
+from utils.utils_continous_learning import continual_learning_yolov8
+import json
+import os
 
-class DropYamlWidget(QWidget):
-    yaml_dropped = pyqtSignal(str)
+class TrainingThread(QThread):
+    progress_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool, str)
 
-    def __init__(self):
+    def __init__(self, model_path, yaml_path, epochs, img_size, batch_size):
         super().__init__()
-        self.setAcceptDrops(True)
-        self.setMinimumHeight(100)
-        self.yaml_path = None
-        
-        # Style pour la zone de drop
-        self.setStyleSheet("""
-            DropYamlWidget {
-                border: 2px dashed #aaa;
-                border-radius: 5px;
-                background-color: #f8f8f8;
-            }
-            DropYamlWidget:hover {
-                border-color: #666;
-            }
-        """)
-        
-        # Layout pour le texte
-        layout = QVBoxLayout(self)
-        self.label = QLabel("Glissez votre fichier YAML ici\nou cliquez pour sélectionner", self)
-        self.label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.label)
+        self.model_path = model_path
+        self.yaml_path = yaml_path
+        self.epochs = epochs
+        self.img_size = img_size
+        self.batch_size = batch_size
 
-    def mousePressEvent(self, event):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Sélectionner un fichier YAML", "", "YAML files (*.yaml *.yml)"
-        )
-        if file_path:
-            self.yaml_dropped.emit(file_path)
-            self.yaml_path = file_path
-            self.label.setText(f"Fichier chargé: {file_path.split('/')[-1]}")
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        for url in event.mimeData().urls():
-            path = url.toLocalFile()
-            if path.lower().endswith(('.yaml', '.yml')):
-                self.yaml_dropped.emit(path)
-                self.yaml_path = path
-                self.label.setText(f"Fichier chargé: {path.split('/')[-1]}")
-                break
+    def run(self):
+        try:
+            self.progress_signal.emit("Démarrage de l'apprentissage...")
+            continual_learning_yolov8(
+                model_path=self.model_path,
+                data_config_path=self.yaml_path,
+                epochs=self.epochs,
+                img_size=self.img_size,
+                batch_size=self.batch_size
+            )
+            self.finished_signal.emit(True, "Apprentissage terminé avec succès!")
+        except Exception as e:
+            self.finished_signal.emit(False, f"Erreur: {str(e)}")
 
 class ContinuousLearningUI(QWidget):
     def __init__(self):
         super().__init__()
+        self.yaml_path = None
+        self.training_thread = None
         self.init_ui()
 
     def init_ui(self):
-        # Layout principal
         main_layout = QVBoxLayout(self)
 
         # Zone de drop pour le YAML
-        self.yaml_drop = DropYamlWidget()
-        main_layout.addWidget(self.yaml_drop)
+        self.drop_zone = QWidget()
+        self.drop_zone.setAcceptDrops(True)
+        self.drop_zone.setMinimumHeight(100)
+        self.drop_zone.setStyleSheet("""
+            QWidget {
+                border: 2px dashed #aaa;
+                border-radius: 5px;
+                background-color: #f8f8f8;
+            }
+            QWidget:hover {
+                border-color: #666;
+            }
+        """)
+        
+        drop_layout = QVBoxLayout(self.drop_zone)
+        self.drop_label = QLabel("Glissez votre fichier YAML ici\nou cliquez pour sélectionner")
+        self.drop_label.setAlignment(Qt.AlignCenter)
+        drop_layout.addWidget(self.drop_label)
+        
+        main_layout.addWidget(self.drop_zone)
+        self.drop_zone.installEventFilter(self)
+        self.drop_zone.mousePressEvent = self.select_yaml
 
-        # Formulaire pour les paramètres
+        # Formulaire des paramètres
+        params_group = QGroupBox("Paramètres d'apprentissage")
         form_layout = QFormLayout()
 
-        # Nombre d'époques
         self.epochs_input = QSpinBox()
         self.epochs_input.setRange(1, 1000)
         self.epochs_input.setValue(100)
         form_layout.addRow("Nombre d'époques:", self.epochs_input)
 
-        # Taille des images
         self.img_size_input = QSpinBox()
         self.img_size_input.setRange(32, 1280)
         self.img_size_input.setValue(640)
         self.img_size_input.setSingleStep(32)
         form_layout.addRow("Taille des images:", self.img_size_input)
 
-        # Batch size
         self.batch_size_input = QSpinBox()
         self.batch_size_input.setRange(1, 128)
         self.batch_size_input.setValue(16)
         form_layout.addRow("Batch size:", self.batch_size_input)
 
-        main_layout.addLayout(form_layout)# Label pour les informations
-        self.info_label = QLabel("")
-        self.info_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.info_label)
-        
-        # Label pour les informations
+        params_group.setLayout(form_layout)
+        main_layout.addWidget(params_group)
+
+        # Barre de progression et information
         self.info_label = QLabel("")
         self.info_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.info_label)
@@ -103,27 +100,83 @@ class ContinuousLearningUI(QWidget):
         self.start_button.clicked.connect(self.start_learning)
         main_layout.addWidget(self.start_button)
 
-        
+    def eventFilter(self, obj, event):
+        if obj == self.drop_zone:
+            if event.type() == event.DragEnter:
+                if event.mimeData().hasUrls():
+                    event.acceptProposedAction()
+                    return True
+            elif event.type() == event.Drop:
+                url = event.mimeData().urls()[0]
+                path = url.toLocalFile()
+                if path.lower().endswith(('.yaml', '.yml')):
+                    self.yaml_path = path
+                    self.drop_label.setText(f"Fichier chargé: {os.path.basename(path)}")
+                return True
+        return super().eventFilter(obj, event)
+
+    def select_yaml(self, event):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Sélectionner un fichier YAML",
+            "",
+            "YAML files (*.yaml *.yml)"
+        )
+        if file_path:
+            self.yaml_path = file_path
+            self.drop_label.setText(f"Fichier chargé: {os.path.basename(file_path)}")
 
     def start_learning(self):
-        if not self.yaml_drop.yaml_path:
-            self.info_label.setText("Erreur: Veuillez d'abord charger un fichier YAML")
+        if not self.yaml_path:
+            QMessageBox.warning(self, "Erreur", "Veuillez d'abord charger un fichier YAML")
             return
 
-        config = {
-            'yaml_path': self.yaml_drop.yaml_path,
-            'epochs': self.epochs_input.value(),
-            'img_size': self.img_size_input.value(),
-            'batch_size': self.batch_size_input.value()
-        }
+        try:
+            # Charger le modèle depuis la configuration
+            with open("config/model_config.json", 'r') as f:
+                config = json.load(f)
+                model_path = os.path.join(config.get('models_directory', ''), config.get('selected_model', ''))
 
-        self.info_label.setText(
-            f"Configuration:\n"
-            f"YAML: {config['yaml_path'].split('/')[-1]}\n"
-            f"Époques: {config['epochs']}\n"
-            f"Taille images: {config['img_size']}\n"
-            f"Batch size: {config['batch_size']}"
-        )
-        
-        # Ici, vous pouvez ajouter la logique pour démarrer l'apprentissage
-        # avec les paramètres configurés
+            if not os.path.exists(model_path):
+                QMessageBox.warning(self, "Erreur", "Aucun modèle valide n'a été configuré")
+                return
+
+            # Désactiver les contrôles pendant l'apprentissage
+            self.start_button.setEnabled(False)
+            self.drop_zone.setEnabled(False)
+            self.epochs_input.setEnabled(False)
+            self.img_size_input.setEnabled(False)
+            self.batch_size_input.setEnabled(False)
+
+            # Lancer l'apprentissage dans un thread séparé
+            self.training_thread = TrainingThread(
+                model_path=model_path,
+                yaml_path=self.yaml_path,
+                epochs=self.epochs_input.value(),
+                img_size=self.img_size_input.value(),
+                batch_size=self.batch_size_input.value()
+            )
+            self.training_thread.progress_signal.connect(self.update_progress)
+            self.training_thread.finished_signal.connect(self.training_finished)
+            self.training_thread.start()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors du démarrage: {str(e)}")
+            self.enable_controls()
+
+    def update_progress(self, message):
+        self.info_label.setText(message)
+
+    def training_finished(self, success, message):
+        self.enable_controls()
+        if success:
+            QMessageBox.information(self, "Succès", message)
+        else:
+            QMessageBox.critical(self, "Erreur", message)
+
+    def enable_controls(self):
+        self.start_button.setEnabled(True)
+        self.drop_zone.setEnabled(True)
+        self.epochs_input.setEnabled(True)
+        self.img_size_input.setEnabled(True)
+        self.batch_size_input.setEnabled(True)
