@@ -15,7 +15,7 @@ def update_model(model_path):
     """Met à jour le modèle avec le nouveau chemin"""
     global model
     try:
-        model = YOLO(model_path)
+        model = YOLO(model_path,task="detect")
         print(f"Modèle chargé avec succèss: {model_path}")
         return True
     except Exception as e:
@@ -34,7 +34,7 @@ def predict_image(original_image_path, save_annotations=False, output_directory=
             raise ValueError("Aucun modèle valide n'a été configuré")
             
         # Charger le modèle
-        model = YOLO(model_path)
+        model = YOLO(model_path,task="detect")
         print(f"Modèle chargé avec succès: {model_path}")
         
         original_image = cv2.imread(original_image_path)
