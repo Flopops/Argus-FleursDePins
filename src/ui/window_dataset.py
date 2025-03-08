@@ -394,9 +394,11 @@ class DatasetUI(QWidget):
             temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
             os.makedirs(temp_dir, exist_ok=True)
 
+            # Désactiver les deux boutons pendant le traitement
             self.progress_bar.setVisible(True)
             self.progress_bar.setValue(0)
             self.process_button.setEnabled(False)
+            self.validate_button.setEnabled(False)  # Désactiver le bouton de validation
 
             self.worker = DatasetWorker(
                 task="process",
@@ -474,6 +476,7 @@ class DatasetUI(QWidget):
         # Réinitialiser l'interface
         self.progress_bar.setVisible(False)
         self.process_button.setEnabled(False)
+        self.validate_button.setEnabled(True)  # Réactiver le bouton de validation
         self.images = []
         self.csv_files = []
         self.merged_df = None
@@ -482,5 +485,5 @@ class DatasetUI(QWidget):
     def on_error(self, error_message):
         QMessageBox.critical(self, "Erreur", error_message)
         self.progress_bar.setVisible(False)
-        self.validate_button.setEnabled(True)
+        self.validate_button.setEnabled(True)  # Réactiver le bouton en cas d'erreur
         self.process_button.setEnabled(bool(self.merged_df)) 

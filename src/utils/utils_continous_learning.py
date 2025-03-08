@@ -23,7 +23,8 @@ def continual_learning_yolo(model_path, data_config_path, epochs=10, img_size=64
         epochs=epochs,
         imgsz=img_size,
         batch=batch_size,
-        device=device  # Utiliser le GPU si disponible
+        device=device, 
+        save=save_path
     )
     
    
