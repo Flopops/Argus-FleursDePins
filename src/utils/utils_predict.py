@@ -6,6 +6,7 @@ import torchvision
 from sklearn.cluster import DBSCAN
 import os
 import json
+from sklearn.neighbors import NearestNeighbors
 
 # Variable globale pour le modèle
 global model
@@ -21,6 +22,27 @@ def update_model(model_path):
     except Exception as e:
         print(f"Erreur lors du chargement du modèle: {e}")
         return False
+
+def calculate_adaptive_eps(centers):
+    """Calcule une valeur eps adaptative basée sur les distances entre les centres"""
+    if len(centers) < 2:
+        return 10  # Valeur par défaut si peu de détections
+        
+    # Calculer les distances aux k plus proches voisins
+    k = min(3, len(centers))
+    nbrs = NearestNeighbors(n_neighbors=k).fit(centers)
+    distances, _ = nbrs.kneighbors(centers)
+    
+    # Calculer la distance moyenne aux plus proches voisins
+    mean_distance = np.mean(distances[:, 1:])  # Exclure la distance à soi-même
+    print(f"Distance moyenne: {mean_distance}")
+    # Ajuster eps en fonction de la distance moyenne
+    if mean_distance < 150:
+        return 10  # Pour les détections très proches
+    elif mean_distance < 200:
+        return 20  # Pour les détections moyennement espacées
+    else:
+        return 30  # Pour les détections très espacées
 
 def predict_image(original_image_path, save_annotations=False, output_directory=None):
     """Prédit sur une image en utilisant le modèle configuré dans model_config.json"""
@@ -83,9 +105,11 @@ def predict_image(original_image_path, save_annotations=False, output_directory=
             # Convertir en (x_centre, y_centre, largeur, hauteur)
             centers = np.array([[ (b[0] + b[2]) / 2, (b[1] + b[3]) / 2 ] for b in boxes])
 
-
-            # Appliquer DBSCAN pour grouper les boîtes proches
-            clustering = DBSCAN(eps=30, min_samples=1).fit(centers)
+            # Calculer eps adaptatif
+            eps = calculate_adaptive_eps(centers)
+            print(f"Eps adaptatif: {eps}")
+            # Appliquer DBSCAN avec eps adaptatif
+            clustering = DBSCAN(eps=eps, min_samples=1).fit(centers)
 
             # Fusionner les boîtes du même groupe
             unique_clusters = np.unique(clustering.labels_)
@@ -115,11 +139,14 @@ def predict_image(original_image_path, save_annotations=False, output_directory=
             'pine_flowers': len(final_detections)
         }
         if save_annotations and output_directory:
+            # Forcer l'extension en .jpg
+            base_name = os.path.splitext(os.path.basename(original_image_path))[0]
             output_filename = os.path.join(
                 output_directory,
-                f"annotated_{os.path.basename(original_image_path)}"
+                f"annotated_{base_name}.jpg"  # Extension forcée en .jpg
             )
-            cv2.imwrite(output_filename, annotated_image)
+            # Sauvegarder en JPG avec une qualité de 95%
+            cv2.imwrite(output_filename, annotated_image, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
         return annotation_counts
 

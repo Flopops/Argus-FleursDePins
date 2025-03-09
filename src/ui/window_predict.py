@@ -51,6 +51,7 @@ class PredictUI(QWidget):
         # Ajouter un bouton pour lancer la prédiction
         self.predict_button = QPushButton("Lancer la prédiction", self)
         self.predict_button.clicked.connect(self.process_predictions)
+        self.predict_button.setEnabled(False)  # Désactivé par défaut
         layout.addWidget(self.predict_button)
 
         # Ajouter l'attribut pour le thread de prédiction
@@ -65,6 +66,10 @@ class PredictUI(QWidget):
         file_names, _ = QFileDialog.getOpenFileNames(self, "Charger des images", "",
                                                      "Images (*.png *.xpm *.jpg *.jpeg *.tiff *.bmp *tif);;All Files (*)", options=options)
         if file_names:
+            # Désactiver le bouton pendant le chargement
+            self.predict_button.setEnabled(False)
+            self.load_button.setEnabled(False)
+            
             # Ajouter les nouveaux chemins à la liste existante
             self.image_paths.extend(file_names)
             self.progress_bar.setMaximum(len(self.image_paths))
@@ -73,7 +78,7 @@ class PredictUI(QWidget):
             self.loader_thread.progress_updated.connect(self.update_progress)
             self.loader_thread.image_loaded.connect(self.add_image)
             self.loader_thread.error_occurred.connect(self.show_error_message)
-            self.loader_thread.finished.connect(self.reset_progress_bar)
+            self.loader_thread.finished.connect(self.on_loading_finished)
             self.loader_thread.start()
 
     def process_predictions(self):
@@ -169,7 +174,17 @@ class PredictUI(QWidget):
         self.progress_bar.reset()
         self.result_label.setText("Images chargées. Prêt pour la prédiction.")
 
+    def on_loading_finished(self):
+        self.reset_progress_bar()
+        self.load_button.setEnabled(True)
+        # Activer le bouton de prédiction seulement si des images sont chargées
+        self.predict_button.setEnabled(len(self.image_paths) > 0)
+
     def handle_dropped_files(self, file_paths):
+        # Désactiver le bouton pendant le chargement
+        self.predict_button.setEnabled(False)
+        self.load_button.setEnabled(False)
+        
         # Ajouter les nouveaux chemins à la liste existante
         self.image_paths.extend(file_paths)
         self.progress_bar.setMaximum(len(self.image_paths))
@@ -178,7 +193,7 @@ class PredictUI(QWidget):
         self.loader_thread.progress_updated.connect(self.update_progress)
         self.loader_thread.image_loaded.connect(self.add_image)
         self.loader_thread.error_occurred.connect(self.show_error_message)
-        self.loader_thread.finished.connect(self.reset_progress_bar)
+        self.loader_thread.finished.connect(self.on_loading_finished)
         self.loader_thread.start()
 
 # Nouveau widget pour gérer le drag & drop

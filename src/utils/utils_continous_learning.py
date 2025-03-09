@@ -12,6 +12,7 @@ def continual_learning_yolo(model_path, data_config_path, epochs=10, img_size=64
     :param save_path: Chemin où sauvegarder le modèle avant réentraînement.
     """
     # Charger le modèle Yolo pré-entraîné
+    model = YOLO('yolo12n.pt')
     model = YOLO(model_path)
 
     # Vérifier si CUDA est disponible et définir le device
