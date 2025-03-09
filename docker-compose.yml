@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  yolo-app:
+    build: .
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - ~/.Xauthority:/root/.Xauthority
+    network_mode: host 

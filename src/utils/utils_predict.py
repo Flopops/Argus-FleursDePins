@@ -47,6 +47,10 @@ def calculate_adaptive_eps(centers):
 def predict_image(original_image_path, save_annotations=False, output_directory=None):
     """Prédit sur une image en utilisant le modèle configuré dans model_config.json"""
     try:
+        # Vérifier si CUDA est disponible
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        print(f"Utilisation de : {device}")
+        
         # Charger la configuration
         with open("config/model_config.json", 'r') as f:
             config = json.load(f)
@@ -55,9 +59,10 @@ def predict_image(original_image_path, save_annotations=False, output_directory=
         if not os.path.exists(model_path):
             raise ValueError("Aucun modèle valide n'a été configuré")
             
-        # Charger le modèle
-        model = YOLO(model_path,task="detect")
-        print(f"Modèle chargé avec succès: {model_path}")
+        # Charger le modèle et le mettre sur le bon device
+        model = YOLO(model_path, task="detect")
+        model.to(device)
+        print(f"Modèle chargé avec succès sur {device}: {model_path}")
         
         original_image = cv2.imread(original_image_path)
 
@@ -143,7 +148,7 @@ def predict_image(original_image_path, save_annotations=False, output_directory=
             base_name = os.path.splitext(os.path.basename(original_image_path))[0]
             output_filename = os.path.join(
                 output_directory,
-                f"annotated_{base_name}.jpg"  # Extension forcée en .jpg
+                f"annotated_{base_name}.jpg"  
             )
             # Sauvegarder en JPG avec une qualité de 95%
             cv2.imwrite(output_filename, annotated_image, [cv2.IMWRITE_JPEG_QUALITY, 95])
