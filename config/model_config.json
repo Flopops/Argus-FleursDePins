@@ -1,4 +1,4 @@
 {
     "models_directory": "/home/oem/Argus-FleursDePins/pretrained_models",
-    "selected_model": "best.pt"
+    "selected_model": "best_petite_fleurs_de_pins.pt"
 }

@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from PyQt5.QtCore import QObject, pyqtSignal
 import shutil
 from sklearn.model_selection import train_test_split
-
+import numpy as np
 class DatasetProcessor(QObject):
     progress_updated = pyqtSignal(int)
     status_updated = pyqtSignal(str)
@@ -241,7 +241,11 @@ def validate_and_merge_csv(csv_files: List[str]) -> Tuple[Optional[pd.DataFrame]
 
     except Exception as e:
         return None, f"Erreur lors de la fusion des fichiers: {str(e)}"
-
+def apply_gamma_correction(image, gamma=0.4):
+    # Appliquer la correction gamma
+    inv_gamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+    return cv2.LUT(image, table)
 def convert_yolo_format(df: pd.DataFrame) -> pd.DataFrame:
     """
     Convertit un DataFrame du format YOLO vers le format requis.
@@ -543,7 +547,7 @@ def organize_dataset_with_txt(image_folder, output_folder, train_ratio=0.8, val_
         # Copier l'annotation si elle existe
         if os.path.exists(src_label_path):
             shutil.copy(src_label_path, dest_label_path)
-
+    count_unannotated_train_images(output_folder)
     return {
         'total_annotated': len(annotated_images),
         'total_non_annotated': len(non_annotated_images),
@@ -553,3 +557,48 @@ def organize_dataset_with_txt(image_folder, output_folder, train_ratio=0.8, val_
         'val': len(val_images),
         'test': len(test_images)
     }
+
+def count_unannotated_train_images(dataset_path):
+    """
+    Compte le nombre d'images non annotées dans le dossier train et liste leurs noms.
+    
+    Args:
+        dataset_path: Chemin vers le dossier principal du dataset
+        
+    Returns:
+        int: Nombre d'images non annotées
+    """
+    train_img_dir = os.path.join(dataset_path, 'images/train')
+    train_label_dir = os.path.join(dataset_path, 'labels/train')
+    
+    if not os.path.exists(train_img_dir) or not os.path.exists(train_label_dir):
+        print(f"⚠️ Les dossiers train n'existent pas dans {dataset_path}")
+        return 0
+    
+    unannotated_count = 0
+    total_images = 0
+    unannotated_files = []
+    
+    for img_file in os.listdir(train_img_dir):
+        if img_file.lower().endswith(('.jpg', '.jpeg', '.png', '.tif', '.tiff')):
+            total_images += 1
+            base_name = os.path.splitext(img_file)[0]
+            label_file = os.path.join(train_label_dir, f"{base_name}.txt")
+            if not os.path.exists(label_file):
+                unannotated_count += 1
+                unannotated_files.append(img_file)
+    
+    print(f"\nStatistiques du dossier train:")
+    print(f"Total des images: {total_images}")
+    print(f"Images non annotées: {unannotated_count}")
+    print(f"Images annotées: {total_images - unannotated_count}")
+    print(f"Pourcentage d'images non annotées: {(unannotated_count/total_images)*100:.2f}%")
+    
+    if unannotated_files:
+        print("\nExemples de fichiers non annotés:")
+        for i, file in enumerate(unannotated_files[:5], 1):  # Affiche les 5 premiers fichiers
+            print(f"{i}. {file}")
+        if len(unannotated_files) > 5:
+            print(f"... et {len(unannotated_files) - 5} autres fichiers")
+    
+    return unannotated_count

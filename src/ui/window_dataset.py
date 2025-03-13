@@ -1,14 +1,16 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, 
     QHBoxLayout, QMessageBox, QProgressBar, QGroupBox, QDialog,
-    QSpinBox, QDialogButtonBox
+    QSpinBox, QDialogButtonBox, QCheckBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
 import pandas as pd
 import os
-from utils.utils_dataset import validate_and_merge_csv, process_all_images_in_folder, validate_and_merge_csv_parallel,organize_dataset_with_txt
+from utils.utils_dataset import validate_and_merge_csv, process_all_images_in_folder, validate_and_merge_csv_parallel,organize_dataset_with_txt, apply_gamma_correction
 from utils.utils_dataset import DatasetProcessor
 import shutil
+import cv2
+from utils.utils_augmentation_data import flip_image, rotate_image, apply_gamma_correction
 
 # Ajouter la classe de dialogue
 class DatasetConfigDialog(QDialog):
@@ -182,6 +184,11 @@ class DatasetWorker(QThread):
                     self.kwargs['crop_size'],
                     self.kwargs['overlap']
                 )
+
+                # Apply gamma correction if augmentation is enabled
+                if self.kwargs.get('augmentation', False):
+                    self.apply_augmentation(self.kwargs['output_dir'])
+
                 self.finished.emit({"message": "Success"})
 
             elif self.task == "organize":
@@ -208,8 +215,7 @@ class DatasetWorker(QThread):
                 self.progress_updated.emit(80)
 
                 # Créer le fichier dataset.yaml
-                yaml_content = f"""path: {output_dir}
-train: images/train
+                yaml_content = """train: images/train
 val: images/val
 test: images/test
 
@@ -225,6 +231,99 @@ names: ['pins']  # noms des classes"""
         except Exception as e:
             self.error.emit(str(e))
 
+    def apply_augmentation(self, output_dir):
+        # Compter le nombre total de fichiers à traiter
+        total_files = sum(1 for _, _, files in os.walk(output_dir) 
+                         for file in files 
+                         if file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')))
+        
+        processed_files = 0
+        self.progress_updated.emit(0)
+        self.status_updated.emit("Début de l'augmentation des données...")
+
+        for root, _, files in os.walk(output_dir):
+            for file in files:
+                if file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')):
+                    image_path = os.path.join(root, file)
+                    image = cv2.imread(image_path)
+                    if image is not None:
+                        base_name = os.path.splitext(file)[0]
+                        # Définir annotation_path ici
+                        annotation_path = os.path.join(root, f"{base_name}.txt")
+                        
+                        # Appliquer les augmentations sélectionnées
+                        if self.kwargs['augmentation_options']['gamma']:
+                            self.status_updated.emit(f"Application gamma correction sur {file}")
+                            gamma_image = apply_gamma_correction(image)
+                            gamma_path = os.path.join(root, f"gamma_{file}")
+                            cv2.imwrite(gamma_path, gamma_image)
+                            if os.path.exists(annotation_path):
+                                shutil.copy(annotation_path, os.path.join(root, f"gamma_{base_name}.txt"))
+                        
+                        if self.kwargs['augmentation_options']['flip']:
+                            self.status_updated.emit(f"Application flip horizontal sur {file}")
+                            flip_image_h = flip_image(image, 1)
+                            flip_path = os.path.join(root, f"flip_{file}")
+                            cv2.imwrite(flip_path, flip_image_h)
+                            if os.path.exists(annotation_path):
+                                self.update_annotation_for_flip(annotation_path, root, f"flip_{base_name}.txt", image.shape[1])
+                        
+                        if self.kwargs['augmentation_options']['rotate']:
+                            self.status_updated.emit(f"Application rotation sur {file}")
+                            rotated_image = rotate_image(image, 90)
+                            rotate_path = os.path.join(root, f"rotate_{file}")
+                            cv2.imwrite(rotate_path, rotated_image)
+                            if os.path.exists(annotation_path):
+                                self.update_annotation_for_rotation(annotation_path, root, f"rotate_{base_name}.txt")
+
+                    processed_files += 1
+                    progress = int((processed_files / total_files) * 100)
+                    self.progress_updated.emit(progress)
+
+        self.status_updated.emit("Augmentation des données terminée")
+
+    def update_annotation_for_flip(self, annotation_path, output_dir, new_annotation_name, image_width):
+        with open(annotation_path, 'r') as file:
+            lines = file.readlines()
+
+        new_lines = []
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) >= 5:
+                # Assuming YOLO format: class x_center y_center width height
+                class_id, x_center, y_center, width, height = map(float, parts)
+                # Flip horizontally: x_center = 1 - x_center
+                x_center = 1 - x_center
+                new_lines.append(f"{class_id} {x_center} {y_center} {width} {height}\n")
+
+        new_annotation_path = os.path.join(output_dir, new_annotation_name)
+        with open(new_annotation_path, 'w') as file:
+            file.writelines(new_lines)
+
+    def update_annotation_for_rotation(self, annotation_path, output_dir, new_annotation_name):
+        """Met à jour les annotations pour une rotation de 90 degrés"""
+        with open(annotation_path, 'r') as file:
+            lines = file.readlines()
+
+        new_lines = []
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) >= 5:
+                class_id, x_center, y_center, width, height = map(float, parts)
+                # Pour une rotation de 90°:
+                # - Le nouveau x est l'ancien y
+                # - Le nouveau y est 1 - l'ancien x
+                # - Échanger width et height
+                new_x = y_center
+                new_y = 1 - x_center
+                new_width = height
+                new_height = width
+                new_lines.append(f"{class_id} {new_x} {new_y} {new_width} {new_height}\n")
+
+        new_annotation_path = os.path.join(output_dir, new_annotation_name)
+        with open(new_annotation_path, 'w') as file:
+            file.writelines(new_lines)
+
 class DatasetUI(QWidget):
     def __init__(self):
         super().__init__()
@@ -235,6 +334,7 @@ class DatasetUI(QWidget):
         self.dataset_processor.progress_updated.connect(self.update_progress)
         self.dataset_processor.status_updated.connect(self.update_status)
         self.worker = None
+        self.data_augmentation_enabled = False  # New attribute to track augmentation state
         self.init_ui()
 
     def init_ui(self):
@@ -294,6 +394,32 @@ class DatasetUI(QWidget):
         self.process_button.setEnabled(False)  # Désactivé par défaut
         dataset_layout.addWidget(self.process_button)
 
+        # Groupe pour les options d'augmentation
+        augmentation_group = QGroupBox("Options d'augmentation")
+        augmentation_layout = QVBoxLayout()
+
+        self.augmentation_checkbox = QCheckBox("Activer l'augmentation de données")
+        self.gamma_checkbox = QCheckBox("Correction gamma")
+        self.flip_checkbox = QCheckBox("Flip horizontal")
+        self.rotate_checkbox = QCheckBox("Rotation 90°")
+
+        # Désactiver les options par défaut
+        self.gamma_checkbox.setEnabled(False)
+        self.flip_checkbox.setEnabled(False)
+        self.rotate_checkbox.setEnabled(False)
+
+        # Connecter les signaux
+        self.augmentation_checkbox.stateChanged.connect(self.toggle_augmentation_options)
+
+        augmentation_layout.addWidget(self.augmentation_checkbox)
+        augmentation_layout.addWidget(self.gamma_checkbox)
+        augmentation_layout.addWidget(self.flip_checkbox)
+        augmentation_layout.addWidget(self.rotate_checkbox)
+        augmentation_group.setLayout(augmentation_layout)
+
+        dataset_layout.addWidget(augmentation_group)
+
+        # Ajouter le groupe principal au layout principal
         main_layout.addWidget(dataset_group)
 
         # Installer l'event filter pour le drag & drop
@@ -385,6 +511,14 @@ class DatasetUI(QWidget):
         self.validate_button.setEnabled(True)
         self.progress_bar.setVisible(False)
 
+    def toggle_augmentation_options(self, state):
+        """Active/désactive les options d'augmentation"""
+        enabled = state == Qt.Checked
+        self.gamma_checkbox.setEnabled(enabled)
+        self.flip_checkbox.setEnabled(enabled)
+        self.rotate_checkbox.setEnabled(enabled)
+        self.data_augmentation_enabled = enabled
+
     def process_images(self):
         if self.merged_df is None or not self.images:
             QMessageBox.warning(self, "Erreur", "Veuillez d'abord valider le dataset")
@@ -406,7 +540,13 @@ class DatasetUI(QWidget):
                 df=self.merged_df,
                 output_dir=temp_dir,
                 crop_size=(640, 640),
-                overlap=100
+                overlap=100,
+                augmentation=self.data_augmentation_enabled,
+                augmentation_options={
+                    'gamma': self.gamma_checkbox.isChecked(),
+                    'flip': self.flip_checkbox.isChecked(),
+                    'rotate': self.rotate_checkbox.isChecked()
+                }
             )
             self.worker.progress_updated.connect(self.update_progress)
             self.worker.status_updated.connect(self.update_status)

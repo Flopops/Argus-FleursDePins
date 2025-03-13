@@ -37,9 +37,9 @@ def calculate_adaptive_eps(centers):
     mean_distance = np.mean(distances[:, 1:])  # Exclure la distance à soi-même
     print(f"Distance moyenne: {mean_distance}")
     # Ajuster eps en fonction de la distance moyenne
-    if mean_distance < 150:
+    if mean_distance < 105:
         return 10  # Pour les détections très proches
-    elif mean_distance < 200:
+    elif mean_distance < 220:
         return 20  # Pour les détections moyennement espacées
     else:
         return 30  # Pour les détections très espacées
