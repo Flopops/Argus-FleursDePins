@@ -14,24 +14,29 @@ class TrainingThread(QThread):
     finished_signal = pyqtSignal(bool, str)
     CONFIG_FILE = "config/model_config.json"
 
-    def __init__(self, model_path, yaml_path, epochs, img_size, batch_size):
+    def __init__(self, model_path, yaml_path, epochs, img_size, batch_size,directory):
         super().__init__()
         self.model_path = model_path
         self.yaml_path = yaml_path
         self.epochs = epochs
         self.img_size = img_size
         self.batch_size = batch_size
-
+        self.directory = directory
     def run(self):
         try:
             self.progress_signal.emit("Démarrage de l'apprentissage...")
 
+            # Charger le modèle depuis la configuration
+            with open(self.CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                models_directory = config.get('models_directory', '')
+
             # Générer le chemin de sauvegarde avec la date et l'heure
             model_name = os.path.splitext(os.path.basename(self.model_path))[0]
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = os.path.join(os.path.dirname(self.model_path), f"{model_name}_{timestamp}.pt")
+            save_path = os.path.join(models_directory, f"{model_name}_{timestamp}.pt")
 
-            continual_learning_yolo(self.model_path,self.yaml_path,self.epochs,self.img_size,self.batch_size,save_path)
+            continual_learning_yolo(self.model_path, self.yaml_path, self.epochs, self.img_size, self.batch_size, save_path,self.directory)
 
             self.finished_signal.emit(True, f"Apprentissage terminé avec succès! Modèle sauvegardé à {save_path}")
         except Exception as e:
@@ -94,6 +99,11 @@ class ContinuousLearningUI(QWidget):
         params_group.setLayout(form_layout)
         main_layout.addWidget(params_group)
 
+        # Barre de progression
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        main_layout.addWidget(self.progress_bar)
+
         # Barre de progression et information
         self.info_label = QLabel("")
         self.info_label.setAlignment(Qt.AlignCenter)
@@ -140,7 +150,7 @@ class ContinuousLearningUI(QWidget):
             with open("config/model_config.json", 'r') as f:
                 config = json.load(f)
                 model_path = os.path.join(config.get('models_directory', ''), config.get('selected_model', ''))
-
+                directory = os.path.join(config.get('models_directory', ''))
             if not os.path.exists(model_path):
                 QMessageBox.warning(self, "Erreur", "Aucun modèle valide n'a été configuré")
                 return
@@ -158,7 +168,8 @@ class ContinuousLearningUI(QWidget):
                 yaml_path=self.yaml_path,
                 epochs=self.epochs_input.value(),
                 img_size=self.img_size_input.value(),
-                batch_size=self.batch_size_input.value()
+                batch_size=self.batch_size_input.value(),
+                directory=directory
             )
             self.training_thread.progress_signal.connect(self.update_progress)
             self.training_thread.finished_signal.connect(self.training_finished)
@@ -170,6 +181,7 @@ class ContinuousLearningUI(QWidget):
 
     def update_progress(self, message):
         self.info_label.setText(message)
+        # Update progress bar here if you have one
 
     def training_finished(self, success, message):
         self.enable_controls()
