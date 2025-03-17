@@ -15,39 +15,46 @@ def continual_learning_yolo(model_path, data_config_path, epochs=10, img_size=64
     :param save_path: Chemin où sauvegarder le modèle avant réentraînement.
     """
     # Charger le modèle Yolo pré-entraîné
+    model = YOLO(os.path.join(os.path.dirname(save_path), 'yolo12n.pt'))
     model = YOLO(model_path)
-
+    
     # Vérifier si CUDA est disponible et définir le device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-    # Entraîner le modèle avec les nouvelles données
+    file_name_without_extension = os.path.splitext(os.path.basename(save_path))[0]
+    
     for epoch in range(epochs):
         # Simulate training process
         # Update progress
         if progress_callback:
             progress_callback(f"Époque {epoch + 1}/{epochs} en cours...")
-        model.train(
-            data=data_config_path,
-            epochs=1,
-            imgsz=img_size,
-            batch=batch_size,
-            device=device, 
-            project=save_path
-        )
-
-    # Déplacer le fichier best.pt
-    best_model_path = os.path.join(os.path.dirname(save_path), 'weights', 'best.pt')
+    directory_save_path=os.path.join(os.path.dirname(save_path),file_name_without_extension)
+    model.train(
+                data=data_config_path,
+                epochs=epochs,
+                imgsz=img_size,
+                batch=batch_size,
+                device=device, 
+                project=directory_save_path
+            )
+    # Déplacer et renommer le fichier best.pt
+    
+    best_model_path = os.path.join(directory_save_path, 'train', 'weights', 'best.pt')
+    print(best_model_path)
     if os.path.exists(best_model_path):
-        shutil.move(best_model_path, directory)
+        os.rename(best_model_path, save_path)
 
     # Conserver results.png
-    results_png_path = os.path.join(os.path.dirname(save_path), 'results.png')
+    results_png_path = os.path.join(directory_save_path, 'train', 'results.png')
+    print(results_png_path)
     if os.path.exists(results_png_path):
-        shutil.copy(results_png_path, os.path.dirname(directory))
+        shutil.move(results_png_path, directory)
 
-    '''# Supprimer le dossier save_path
-    if os.path.exists(os.path.dirname(save_path)):
-        shutil.rmtree(os.path.dirname(save_path))'''
-    
-   
+
+    # Vérifiez si le dossier existe
+    if os.path.exists(directory_save_path):
+        # Supprimez le dossier et tout son contenu
+        shutil.rmtree(directory_save_path)
+        print(f"Le dossier {directory_save_path} a été supprimé avec succès.")
+    else:
+        print(f"Le dossier {directory_save_path} n'existe pas.")
 
