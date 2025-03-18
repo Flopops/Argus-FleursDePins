@@ -47,14 +47,7 @@ def continual_learning_yolo(model_path, data_config_path, epochs=10, img_size=64
     results_png_path = os.path.join(directory_save_path, 'train', 'results.png')
     print(results_png_path)
     if os.path.exists(results_png_path):
-        shutil.move(results_png_path, directory)
+        os.makedirs(os.path.join(directory, 'results'), exist_ok=True)
+        os.rename(results_png_path, os.path.join(directory, 'results',f'results_{file_name_without_extension}.png'))
 
-
-    # Vérifiez si le dossier existe
-    if os.path.exists(directory_save_path):
-        # Supprimez le dossier et tout son contenu
-        shutil.rmtree(directory_save_path)
-        print(f"Le dossier {directory_save_path} a été supprimé avec succès.")
-    else:
-        print(f"Le dossier {directory_save_path} n'existe pas.")
 

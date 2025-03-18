@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import pyqtSignal
 import os
 import json
-
+import shutil
 class ModelSelectorUI(QWidget):
     model_selected = pyqtSignal(str)  # Signal émis quand un nouveau modèle est sélectionné
     CONFIG_FILE = "config/model_config.json"
@@ -14,6 +14,7 @@ class ModelSelectorUI(QWidget):
         self.models_dir = None
         self.init_ui()
         self.load_config()
+        self.clear_subdirectories()  # Supprime les sous-dossiers au démarrage
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -116,3 +117,19 @@ class ModelSelectorUI(QWidget):
         if self.model_combo.currentText() and self.models_dir:
             return os.path.join(self.models_dir, self.model_combo.currentText())
         return None
+
+    def showEvent(self, event):
+        """Rafraîchit la liste des modèles à chaque affichage de la fenêtre"""
+        super().showEvent(event)
+        self.refresh_models_list()
+
+    def clear_subdirectories(self):
+        """Supprime les sous-dossiers dans le répertoire des modèles sauf 'results'"""
+        if self.models_dir and os.path.exists(self.models_dir):
+            for item in os.listdir(self.models_dir):
+                item_path = os.path.join(self.models_dir, item)
+                if os.path.isdir(item_path) and item != "results":
+                    try:
+                        shutil.rmtree(item_path)  # Supprime le dossier et son contenu
+                    except OSError:
+                        print(f"Impossible de supprimer le dossier: {item_path}")

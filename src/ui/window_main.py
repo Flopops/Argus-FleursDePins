@@ -6,7 +6,7 @@ from .window_cl import ContinuousLearningUI
 from .window_model import ModelSelectorUI
 from .window_dataset import DatasetUI
 from utils.utils_predict import update_model
-
+import shutil
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
