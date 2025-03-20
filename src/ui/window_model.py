@@ -91,17 +91,28 @@ class ModelSelectorUI(QWidget):
             self.save_config()  # Sauvegarde la nouvelle configuration
 
     def refresh_models_list(self):
+        """Met à jour la liste des modèles disponibles dans le ComboBox"""
+        if not self.models_dir:
+            return
+
+        selected_model = self.model_combo.currentText()  # Sauvegarde du modèle sélectionné
+
         self.model_combo.clear()
-        if self.models_dir:
-            # Chercher tous les fichiers .pt dans le dossier
-            model_files = [f for f in os.listdir(self.models_dir) 
-                         if f.endswith('.pt')]
-            
-            if model_files:
-                self.model_combo.addItems(model_files)
-                self.info_label.setText(f"Modèles trouvés: {len(model_files)}")
-            else:
-                self.info_label.setText("Aucun modèle (.pt) trouvé dans ce dossier")
+        model_files = [f for f in os.listdir(self.models_dir) if f.endswith('.pt')]
+
+        if model_files:
+            self.model_combo.addItems(model_files)
+            self.info_label.setText(f"Modèles trouvés: {len(model_files)}")
+
+            # Rétablir la sélection précédente si elle existe encore
+            if selected_model in model_files:
+                index = self.model_combo.findText(selected_model)
+                if index >= 0:
+                    self.model_combo.setCurrentIndex(index)
+                    self.current_model_label.setText(f"Modèle sélectionné: {selected_model}")
+        else:
+            self.info_label.setText("Aucun modèle (.pt) trouvé dans ce dossier")
+
 
     def on_model_selected(self, model_name):
         if model_name:
