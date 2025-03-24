@@ -11,7 +11,7 @@ Argus-FleursDePins est une application de détection et d'analyse des fleurs de 
 - 🖼️ Interface graphique intuitive
 - 🔄 Apprentissage continu du modèle
 - 📈 Visualisation des résultats
-- 🎯 Prédiction en temps réel
+
 
 ## Prérequis
 
